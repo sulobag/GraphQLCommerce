@@ -1,0 +1,366 @@
+# import statements can be added here as the schema grows.
+
+
+
+scalar DateTime @scalar(class: "Nuwave\\Lighthouse\\Schema\\Types\\Scalars\\DateTime")
+
+
+type Query {
+  "Read-only health probe to verify API availability."
+  apiVersion: String! @field(resolver: "App\\GraphQL\\Queries\\HealthCheck@version")
+
+  me: User @guard @auth
+
+  products(
+    page: Int! = 1
+    first: Int! = 20
+  ): ProductPaginator!
+    @field(resolver: "App\\GraphQL\\Queries\\ProductQuery@active")
+
+  product(id: ID! @eq): Product @find(model: "App\\Models\\Product")
+
+  searchProducts(
+    term: String!
+    brand: String
+    minPrice: Float
+    maxPrice: Float
+    inStockOnly: Boolean = false
+    page: Int! = 1
+    first: Int! = 20
+  ): ProductSearchResult!
+    @field(resolver: "App\\GraphQL\\Queries\\ProductSearch@search")
+
+  myOrders(
+    page: Int! = 1
+    first: Int! = 20
+  ): [Order!]!
+    @guard
+    @field(resolver: "App\\GraphQL\\Queries\\OrderQuery@forCurrentUser")
+
+  order(id: ID!): Order!
+    @guard
+    @field(resolver: "App\\GraphQL\\Queries\\OrderQuery@order")
+
+  myAddresses: [Address!]!
+    @guard
+    @field(resolver: "App\\GraphQL\\Queries\\AddressQuery@myAddresses")
+
+  address(id: ID!): Address!
+    @guard
+    @field(resolver: "App\\GraphQL\\Queries\\AddressQuery@address")
+
+  orderPayments(orderId: ID!): [Payment!]!
+    @guard
+    @field(resolver: "App\\GraphQL\\Queries\\PaymentQuery@orderPayments")
+
+  payment(id: ID!): Payment!
+    @guard
+    @field(resolver: "App\\GraphQL\\Queries\\PaymentQuery@payment")
+
+  myCart: Cart!
+    @guard
+    @field(resolver: "App\\GraphQL\\Queries\\CartQuery@myCart")
+}
+
+
+type Mutation {
+  healthPing(message: String): String! @field(resolver: "App\\GraphQL\\Mutations\\HealthCheck@ping")
+
+  register(input: RegisterInput!): AuthPayload!
+    @field(resolver: "App\\GraphQL\\Mutations\\AuthMutator@register")
+
+  login(email: String!, password: String!): AuthPayload!
+    @field(resolver: "App\\GraphQL\\Mutations\\AuthMutator@login")
+
+  updateProfile(input: UpdateProfileInput!): User!
+    @guard
+    @field(resolver: "App\\GraphQL\\Mutations\\ProfileMutator@updateProfile")
+
+  upsertAddress(input: AddressInput!): Address!
+    @guard
+    @field(resolver: "App\\GraphQL\\Mutations\\AddressMutator@upsert")
+
+  deleteAddress(id: ID!): Boolean!
+    @guard
+    @field(resolver: "App\\GraphQL\\Mutations\\AddressMutator@delete")
+
+  upsertProduct(input: ProductInput!): Product!
+    @field(resolver: "App\\GraphQL\\Mutations\\ProductMutator@upsert")
+
+  checkout(input: CheckoutInput!): CheckoutPayload!
+    @guard
+    @field(resolver: "App\\GraphQL\\Mutations\\CheckoutMutator@checkout")
+
+  cancelOrder(id: ID!): Order!
+    @guard
+    @field(resolver: "App\\GraphQL\\Mutations\\OrderMutator@cancelOrder")
+
+  updateOrderStatus(id: ID!, status: String!): Order!
+    @guard
+    @field(resolver: "App\\GraphQL\\Mutations\\OrderMutator@updateOrderStatus")
+
+  createPayment(input: PaymentInput!): Payment!
+    @guard
+    @field(resolver: "App\\GraphQL\\Mutations\\PaymentMutator@createPayment")
+
+  updatePaymentStatus(id: ID!, status: String!): Payment!
+    @guard
+    @field(resolver: "App\\GraphQL\\Mutations\\PaymentMutator@updatePaymentStatus")
+
+  addToCart(input: AddToCartInput!): Cart!
+    @guard
+    @field(resolver: "App\\GraphQL\\Mutations\\CartMutator@addToCart")
+
+  updateCartItem(input: UpdateCartItemInput!): Cart!
+    @guard
+    @field(resolver: "App\\GraphQL\\Mutations\\CartMutator@updateCartItem")
+
+  removeFromCart(itemId: ID!): Cart!
+    @guard
+    @field(resolver: "App\\GraphQL\\Mutations\\CartMutator@removeFromCart")
+
+  clearCart: Cart!
+    @guard
+    @field(resolver: "App\\GraphQL\\Mutations\\CartMutator@clearCart")
+}
+
+
+type User {
+  id: ID!
+  name: String!
+  email: String!
+  phone: String
+  defaultCurrency: String! @rename(attribute: "default_currency")
+  status: String!
+  preferences: String
+  emailVerifiedAt: DateTime @rename(attribute: "email_verified_at")
+  lastLoginAt: DateTime @rename(attribute: "last_login_at")
+  profileCompletedAt: DateTime @rename(attribute: "profile_completed_at")
+  createdAt: DateTime! @rename(attribute: "created_at")
+  updatedAt: DateTime! @rename(attribute: "updated_at")
+
+  addresses: [Address!]! @hasMany
+  orders: [Order!]! @hasMany
+}
+
+input RegisterInput {
+  name: String!
+  email: String!
+  password: String!
+  phone: String
+}
+
+input UpdateProfileInput {
+  name: String
+  phone: String
+  defaultCurrency: String
+  preferences: String
+}
+
+type AuthPayload {
+  user: User!
+  accessToken: String!
+  tokenType: String!
+  expiresAt: DateTime
+}
+
+
+type Address {
+  id: ID!
+  uuid: String!
+  label: String!
+  contactName: String! @rename(attribute: "contact_name")
+  line1: String!
+  line2: String
+  city: String!
+  state: String
+  postalCode: String @rename(attribute: "postal_code")
+  country: String!
+  phone: String
+  type: String!
+  isPrimary: Boolean! @rename(attribute: "is_primary")
+  metadata: String
+  createdAt: DateTime! @rename(attribute: "created_at")
+  updatedAt: DateTime! @rename(attribute: "updated_at")
+}
+
+input AddressInput {
+  id: ID
+  label: String!
+  contactName: String!
+  line1: String!
+  line2: String
+  city: String!
+  state: String
+  postalCode: String
+  country: String!
+  phone: String
+  type: String! = "shipping"
+  isPrimary: Boolean = false
+  metadata: String
+}
+
+
+type Product {
+  id: ID!
+  uuid: String!
+  sku: String!
+  slug: String!
+  title: String!
+  brand: String
+  category: String!
+  description: String
+  price: Float!
+  currency: String!
+  isActive: Boolean! @rename(attribute: "is_active")
+  metadata: String
+  searchTags: [String!] @rename(attribute: "search_tags")
+  primaryImageUrl: String @rename(attribute: "primary_image_url")
+  createdAt: DateTime! @rename(attribute: "created_at")
+  updatedAt: DateTime! @rename(attribute: "updated_at")
+
+  inventory: Inventory @hasOne
+}
+
+type Inventory {
+  id: ID!
+  availableQuantity: Int! @rename(attribute: "available_quantity")
+  reservedQuantity: Int! @rename(attribute: "reserved_quantity")
+  safetyThreshold: Int! @rename(attribute: "safety_threshold")
+}
+
+input ProductInput {
+  id: ID
+  sku: String!
+  title: String!
+  brand: String
+  category: String = "default"
+  description: String
+  price: Float!
+  currency: String! = "TRY"
+  isActive: Boolean = true
+  searchTags: [String!]
+  primaryImageUrl: String
+  metadata: String
+}
+
+type ProductPaginator {
+  data: [Product!]!
+  paginatorInfo: PaginatorInfo!
+}
+
+type PaginatorInfo {
+  count: Int!
+  currentPage: Int!
+  firstItem: Int
+  hasMorePages: Boolean!
+  lastItem: Int
+  lastPage: Int!
+  perPage: Int!
+  total: Int!
+}
+
+type ProductSearchResult {
+  items: [Product!]!
+  total: Int!
+  page: Int!
+  first: Int!
+}
+
+
+type Order {
+  id: ID!
+  uuid: String!
+  status: String!
+  paymentStatus: String! @rename(attribute: "payment_status")
+  totalAmount: Float! @rename(attribute: "total_amount")
+  currency: String!
+  placedAt: DateTime @rename(attribute: "placed_at")
+  cancelledAt: DateTime @rename(attribute: "cancelled_at")
+  failureReason: String @rename(attribute: "failure_reason")
+  metadata: String
+  createdAt: DateTime! @rename(attribute: "created_at")
+  updatedAt: DateTime! @rename(attribute: "updated_at")
+
+  items: [OrderItem!]! @hasMany
+  payments: [Payment!]! @hasMany
+  shippingAddress: Address @belongsTo(relation: "shippingAddress")
+  billingAddress: Address @belongsTo(relation: "billingAddress")
+}
+
+type OrderItem {
+  id: ID!
+  quantity: Int!
+  unitPrice: Float! @rename(attribute: "unit_price")
+  currency: String!
+  snapshot: String
+
+  product: Product! @belongsTo
+}
+
+type Payment {
+  id: ID!
+  provider: String!
+  status: String!
+  reference: String!
+  amount: Float!
+  currency: String!
+  payload: String
+}
+
+input CheckoutInput {
+  productId: ID!
+  quantity: Int! = 1
+  shippingAddressId: ID
+  billingAddressId: ID
+}
+
+type CheckoutPayload {
+  order: Order!
+  queued: Boolean!
+}
+
+input PaymentInput {
+  orderId: ID!
+  provider: String!
+  status: String = "pending"
+  reference: String!
+  amount: Float!
+  currency: String
+  payload: String
+}
+
+type Cart {
+  id: ID!
+  uuid: String!
+  totalAmount: Float! @rename(attribute: "total_amount")
+  currency: String!
+  metadata: String
+  createdAt: DateTime! @rename(attribute: "created_at")
+  updatedAt: DateTime! @rename(attribute: "updated_at")
+
+  items: [CartItem!]! @hasMany
+}
+
+type CartItem {
+  id: ID!
+  quantity: Int!
+  unitPrice: Float! @rename(attribute: "unit_price")
+  currency: String!
+  lineTotal: Float! @field(resolver: "App\\GraphQL\\Queries\\CartItemResolver@lineTotal")
+  createdAt: DateTime! @rename(attribute: "created_at")
+  updatedAt: DateTime! @rename(attribute: "updated_at")
+
+  product: Product! @belongsTo
+}
+
+input AddToCartInput {
+  productId: ID!
+  quantity: Int! = 1
+}
+
+input UpdateCartItemInput {
+  itemId: ID!
+  quantity: Int!
+}
+
